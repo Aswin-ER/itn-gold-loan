@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <radialGradient id="coinCore" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(22 18) rotate(45) scale(44)">
+      <stop offset="0" stop-color="#FFE8A7"/>
+      <stop offset="0.55" stop-color="#F6C558"/>
+      <stop offset="1" stop-color="#B77A1F"/>
+    </radialGradient>
+    <linearGradient id="coinRim" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF3CA"/>
+      <stop offset="1" stop-color="#9F6315"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="32" cy="32" r="28" fill="url(#coinCore)"/>
+  <circle cx="32" cy="32" r="24" fill="none" stroke="url(#coinRim)" stroke-width="3"/>
+
+  <g fill="#7A4B10">
+    <circle cx="32" cy="15" r="1.4"/>
+    <circle cx="32" cy="49" r="1.4"/>
+    <circle cx="15" cy="32" r="1.4"/>
+    <circle cx="49" cy="32" r="1.4"/>
+  </g>
+
+  <path
+    d="M24.5 41.2V22.8H35.9C39.8 22.8 42.4 24.8 42.4 28.1C42.4 30.6 40.9 32.2 38.3 32.9L42.8 41.2H37.4L33.6 33.8H29.4V41.2H24.5ZM29.4 29.9H34.8C36.3 29.9 37.4 29.2 37.4 27.9C37.4 26.6 36.3 25.9 34.8 25.9H29.4V29.9Z"
+    fill="#6E420D"
+  />
+</svg>

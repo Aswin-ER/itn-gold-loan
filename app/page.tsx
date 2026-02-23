@@ -13,7 +13,7 @@ type GoldPricePayload = {
 const HERO_SLIDES = [
   "/hero-slide-1.jpg",
   "/hero-slide-2.jpg",
-  "/hero-slide-3.jpg",
+  "/hero-slide-3-alt.svg",
 ] as const;
 
 function formatRupees(value: number) {
@@ -181,42 +181,14 @@ export default function Home() {
           <div className="hero-glow orb-2" />
           <div className="container hero-grid">
             <div className="hero-copy reveal">
-              <p className="eyebrow">Trusted Gold Loans In Minutes</p>
+              <p className="eyebrow">Market-Linked Gold Loans</p>
               <h1>
-                Unlock the value of your gold with <span>real-time pricing</span>.
+                Get premium liquidity for your gold with <span>live value protection</span>.
               </h1>
               <p>
-                Fast approvals, transparent rates, and instant disbursal. Designed for modern
-                borrowers who need liquidity without selling family gold.
+                Built for urgent needs and long-term trust. Walk in with jewellery, leave with a
+                transparent offer, secure custody, and same-day disbursal.
               </p>
-              <div className="hero-actions">
-                <a href="#calculator" className="btn btn-primary">
-                  Check EMI
-                </a>
-                <a href="#journey" className="btn btn-ghost">
-                  Explore Process
-                </a>
-              </div>
-            </div>
-            <div className="hero-visual reveal">
-              <div className="hero-stats">
-                <div className="stat-card">
-                  <p>Average Sanction Time</p>
-                  <h3>15 mins</h3>
-                </div>
-                <div className="stat-card">
-                  <p>Loan to Value (Max)</p>
-                  <h3>Up to 75%</h3>
-                </div>
-                <div className="stat-card">
-                  <p>Starting Interest</p>
-                  <h3>9.9% p.a.</h3>
-                </div>
-                <div className="stat-card">
-                  <p>Physical Branches</p>
-                  <h3>1 Store</h3>
-                </div>
-              </div>
             </div>
           </div>
           <div className="hero-slider-dots" aria-hidden="true">
