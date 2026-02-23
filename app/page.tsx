@@ -1,0 +1,416 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+type GoldPricePayload = {
+  live: boolean;
+  spotPriceUsd: number | null;
+  pricePerGramInr: number | null;
+  source: string;
+  updatedAt: string;
+};
+
+const HERO_SLIDES = [
+  "/hero-slide-1.jpg",
+  "/hero-slide-2.jpg",
+  "/hero-slide-3.jpg",
+] as const;
+
+function formatRupees(value: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+export default function Home() {
+  const [priceData, setPriceData] = useState<GoldPricePayload | null>(null);
+  const [loadingPrice, setLoadingPrice] = useState(true);
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  const [weight, setWeight] = useState(35);
+  const [tenure, setTenure] = useState(12);
+  const [annualRate, setAnnualRate] = useState(11.5);
+  const [ltv, setLtv] = useState(75);
+  const [manualPrice, setManualPrice] = useState<number | "">("");
+
+  useEffect(() => {
+    const revealNodes = document.querySelectorAll<HTMLElement>(".reveal");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      },
+      { threshold: 0.15 },
+    );
+
+    revealNodes.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadPrice = async () => {
+      try {
+        const res = await fetch("/api/gold-price", { cache: "no-store" });
+        if (!res.ok) {
+          throw new Error("Failed to fetch gold price");
+        }
+        const data: GoldPricePayload = await res.json();
+        if (mounted) {
+          setPriceData(data);
+        }
+      } catch {
+        if (mounted) {
+          setPriceData({
+            live: false,
+            spotPriceUsd: null,
+            pricePerGramInr: null,
+            source: "Not available",
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      } finally {
+        if (mounted) {
+          setLoadingPrice(false);
+        }
+      }
+    };
+
+    loadPrice();
+    const interval = setInterval(loadPrice, 60_000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % HERO_SLIDES.length);
+    }, 4500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const pricePerGram = manualPrice === "" ? (priceData?.pricePerGramInr ?? null) : manualPrice;
+  const purityFactor = 1;
+
+  const { eligibleLoan, emi, totalRepayment, totalInterest } = useMemo(() => {
+    if (!pricePerGram || pricePerGram <= 0) {
+      return {
+        eligibleLoan: null,
+        emi: null,
+        totalRepayment: null,
+        totalInterest: null,
+      };
+    }
+
+    const estimatedLoan = weight * purityFactor * pricePerGram * (ltv / 100);
+    const monthlyRate = annualRate / 12 / 100;
+    const monthlyEmi =
+      monthlyRate === 0
+        ? estimatedLoan / tenure
+        : (estimatedLoan * monthlyRate * (1 + monthlyRate) ** tenure) /
+          ((1 + monthlyRate) ** tenure - 1);
+    const repayment = monthlyEmi * tenure;
+    return {
+      eligibleLoan: estimatedLoan,
+      emi: monthlyEmi,
+      totalRepayment: repayment,
+      totalInterest: repayment - estimatedLoan,
+    };
+  }, [annualRate, ltv, pricePerGram, tenure, weight]);
+
+  const formatEstimateValue = (value: number | null) =>
+    value === null ? "Not available" : formatRupees(value);
+
+  return (
+    <div className="page-shell">
+      <header className="site-header">
+        <div className="container header-content">
+          <a className="brand" href="#hero">
+            ITN GOLD LOAN
+          </a>
+          <nav className="header-nav">
+            <a href="#benefits">Benefits</a>
+            <a href="#calculator">EMI Calculator</a>
+            <a href="#journey">How It Works</a>
+          </nav>
+          <div className="gold-pill" aria-live="polite">
+            <span className="green-dot" />
+            {loadingPrice ? (
+              <div className="gold-rate-block">
+                <small>Live Gold Price</small>
+                <strong>Loading...</strong>
+              </div>
+            ) : !priceData?.pricePerGramInr ? (
+              <div className="gold-rate-block">
+                <small>Live Gold Price</small>
+                <strong>Not available</strong>
+              </div>
+            ) : (
+              <div className="gold-rate-block">
+                <small>Live Gold Price</small>
+                <strong>{formatRupees(priceData.pricePerGramInr)} / gm</strong>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <section id="hero" className="hero section">
+          <div className="hero-background" aria-hidden="true">
+            {HERO_SLIDES.map((imageUrl, index) => (
+              <div
+                key={imageUrl}
+                className={`hero-bg-slide ${index === activeSlide ? "is-active" : ""}`}
+                style={{ backgroundImage: `url(${imageUrl})` }}
+              />
+            ))}
+          </div>
+          <div className="hero-overlay" aria-hidden="true" />
+          <div className="hero-glow orb-1" />
+          <div className="hero-glow orb-2" />
+          <div className="container hero-grid">
+            <div className="hero-copy reveal">
+              <p className="eyebrow">Trusted Gold Loans In Minutes</p>
+              <h1>
+                Unlock the value of your gold with <span>real-time pricing</span>.
+              </h1>
+              <p>
+                Fast approvals, transparent rates, and instant disbursal. Designed for modern
+                borrowers who need liquidity without selling family gold.
+              </p>
+              <div className="hero-actions">
+                <a href="#calculator" className="btn btn-primary">
+                  Check EMI
+                </a>
+                <a href="#journey" className="btn btn-ghost">
+                  Explore Process
+                </a>
+              </div>
+            </div>
+            <div className="hero-visual reveal">
+              <div className="hero-stats">
+                <div className="stat-card">
+                  <p>Average Sanction Time</p>
+                  <h3>15 mins</h3>
+                </div>
+                <div className="stat-card">
+                  <p>Loan to Value (Max)</p>
+                  <h3>Up to 75%</h3>
+                </div>
+                <div className="stat-card">
+                  <p>Starting Interest</p>
+                  <h3>9.9% p.a.</h3>
+                </div>
+                <div className="stat-card">
+                  <p>Physical Branches</p>
+                  <h3>1 Store</h3>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="hero-slider-dots" aria-hidden="true">
+            {HERO_SLIDES.map((_, index) => (
+              <span key={index} className={`slider-dot ${index === activeSlide ? "is-active" : ""}`} />
+            ))}
+          </div>
+        </section>
+
+        <section id="benefits" className="section benefits">
+          <div className="container">
+            <div className="section-head reveal">
+              <p className="eyebrow">Why Borrowers Choose Us</p>
+              <h2>Built for speed, clarity, and confidence.</h2>
+            </div>
+            <div className="benefit-grid">
+              <article className="benefit-card reveal">
+                <h3>Live Gold Benchmarking</h3>
+                <p>
+                  Loan offers adjust dynamically using current market gold values for fair and
+                  transparent eligibility.
+                </p>
+              </article>
+              <article className="benefit-card reveal">
+                <h3>Secure Vault & Insurance</h3>
+                <p>
+                  Every pledged ornament is barcoded, sealed, and covered with comprehensive vault
+                  insurance.
+                </p>
+              </article>
+              <article className="benefit-card reveal">
+                <h3>Flexible Repayment</h3>
+                <p>
+                  Pay monthly EMI, interest-only with bullet repayment, or close early without
+                  hidden foreclosure penalties.
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="calculator" className="section calculator">
+          <div className="container calculator-grid">
+            <div className="calculator-form reveal">
+              <p className="eyebrow">Gold Loan EMI Calculator</p>
+              <h2>Estimate your EMI in real time</h2>
+
+              <label>
+                Gold Weight (grams)
+                <input
+                  type="number"
+                  min={1}
+                  value={weight}
+                  onChange={(e) => setWeight(Number(e.target.value) || 1)}
+                />
+              </label>
+
+              <label>
+                Purity
+                <div className="single-purity">24K</div>
+              </label>
+
+              <label>
+                Gold Price per Gram (INR)
+                <input
+                  type="number"
+                  min={1}
+                  value={manualPrice}
+                  placeholder={
+                    priceData?.pricePerGramInr ? `${Math.round(priceData.pricePerGramInr)}` : "Not available"
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setManualPrice(value === "" ? "" : Number(value));
+                  }}
+                />
+              </label>
+
+              <label>
+                Tenure: {tenure} months
+                <input
+                  type="range"
+                  min={3}
+                  max={36}
+                  step={1}
+                  value={tenure}
+                  onChange={(e) => setTenure(Number(e.target.value))}
+                />
+              </label>
+
+              <label>
+                Interest Rate: {annualRate.toFixed(1)}% p.a.
+                <input
+                  type="range"
+                  min={8}
+                  max={24}
+                  step={0.1}
+                  value={annualRate}
+                  onChange={(e) => setAnnualRate(Number(e.target.value))}
+                />
+              </label>
+
+              <label>
+                Loan To Value: {ltv}%
+                <input
+                  type="range"
+                  min={50}
+                  max={75}
+                  step={1}
+                  value={ltv}
+                  onChange={(e) => setLtv(Number(e.target.value))}
+                />
+              </label>
+            </div>
+
+            <aside className="result-panel reveal" aria-live="polite">
+              <h3>Your Estimate</h3>
+              <div className="result-row">
+                <span>Eligible Loan Amount</span>
+                <strong>{formatEstimateValue(eligibleLoan)}</strong>
+              </div>
+              <div className="result-row">
+                <span>Monthly EMI</span>
+                <strong>{formatEstimateValue(emi)}</strong>
+              </div>
+              <div className="result-row">
+                <span>Total Interest</span>
+                <strong>{formatEstimateValue(totalInterest)}</strong>
+              </div>
+              <div className="result-row">
+                <span>Total Repayment</span>
+                <strong>{formatEstimateValue(totalRepayment)}</strong>
+              </div>
+
+              <p className="disclaimer">
+                Indicative values only. Final sanction depends on branch valuation, policy checks,
+                and KYC.
+              </p>
+            </aside>
+          </div>
+        </section>
+
+        <section id="journey" className="section journey">
+          <div className="container">
+            <div className="section-head reveal">
+              <p className="eyebrow">How It Works</p>
+              <h2>Four steps from gold to funds.</h2>
+            </div>
+            <div className="timeline">
+              <article className="step reveal">
+                <span>01</span>
+                <h3>Visit Branch</h3>
+                <p>Carry basic KYC, and begin secure valuation.</p>
+              </article>
+              <article className="step reveal">
+                <span>02</span>
+                <h3>Purity & Weight Assessment</h3>
+                <p>Certified appraisers evaluate purity with transparent metrics.</p>
+              </article>
+              <article className="step reveal">
+                <span>03</span>
+                <h3>Instant Offer</h3>
+                <p>Receive a sanction linked to live market price and selected tenure.</p>
+              </article>
+              <article className="step reveal">
+                <span>04</span>
+                <h3>Get Money Same Day</h3>
+                <p>Immediate disbursal.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="site-footer">
+        <div className="container footer-grid">
+          <div>
+            <h3>ITN GOLD LOAN</h3>
+            <p>Offline gold loan services with in-store valuation, secure storage, and same-day disbursal.</p>
+          </div>
+          <div>
+            <h4>Visit Our Store</h4>
+            <p>ITN GOLD LOAN, Perincherry, Thrissur, Kerala</p>
+            <p>Mon - Sat: 9:30 AM to 6:00 PM</p>
+          </div>
+          <div>
+            <h4>Contact</h4>
+            <p>+91 9400081950</p>
+          </div>
+        </div>
+        <div className="container footer-bottom">
+          <p>© {new Date().getFullYear()} ITN GOLD LOAN. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
