@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Script from "next/script";
 
 type GoldPricePayload = {
   live: boolean;
@@ -11,10 +12,46 @@ type GoldPricePayload = {
 };
 
 const HERO_SLIDES = [
-  "/hero-slide-1.jpg",
-  "/hero-slide-2.jpg",
-  "/hero-slide-3-alt.svg",
+  "/maxresdefault.jpg",
+  "/concept-black-money-raid-confiscated-unaccounted-showing-indian-currency-notes-jewelry-151471973.webp",
+  "/close-up-indian-currency-gold-ornaments-indian-money-gold-261510009.webp",
 ] as const;
+
+const SITE_URL = (() => {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (!configured) {
+    return "https://itngoldloan.in";
+  }
+  const withProtocol = configured.startsWith("http://") || configured.startsWith("https://")
+    ? configured
+    : `https://${configured}`;
+  return withProtocol.replace(/\/$/, "");
+})();
+
+const localBusinessSchema = {
+  "@context": "https://schema.org",
+  "@type": "FinancialService",
+  name: "ITN GOLD LOAN",
+  url: SITE_URL,
+  image: `${SITE_URL}/istockphoto-1291330978-612x612.jpg`,
+  telephone: "+91 9400081950",
+  areaServed: "Thrissur, Kerala, India",
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: "Perincherry",
+    addressLocality: "Thrissur",
+    addressRegion: "Kerala",
+    addressCountry: "IN",
+  },
+  openingHoursSpecification: [
+    {
+      "@type": "OpeningHoursSpecification",
+      dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+      opens: "09:30",
+      closes: "18:00",
+    },
+  ],
+};
 
 function formatRupees(value: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -133,6 +170,11 @@ export default function Home() {
 
   return (
     <div className="page-shell">
+      <Script
+        id="financial-service-schema"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}
+      />
       <header className="site-header">
         <div className="container header-content">
           <a className="brand" href="#hero">
@@ -189,6 +231,14 @@ export default function Home() {
                 Built for urgent needs and long-term trust. Walk in with jewellery, leave with a
                 transparent offer, secure custody, and same-day disbursal.
               </p>
+              <div className="hero-actions">
+                <a className="btn btn-primary" href="tel:+919400081950">
+                  Call Now For Instant Quote
+                </a>
+                <a className="btn btn-ghost" href="#calculator">
+                  Check EMI & Eligibility
+                </a>
+              </div>
             </div>
           </div>
           <div className="hero-slider-dots" aria-hidden="true">
@@ -327,6 +377,14 @@ export default function Home() {
                 Indicative values only. Final sanction depends on branch valuation, policy checks,
                 and KYC.
               </p>
+              <div className="hero-actions">
+                <a className="btn btn-primary" href="tel:+919400081950">
+                  Call To Confirm Offer
+                </a>
+                <a className="btn btn-ghost" href="#journey">
+                  View Approval Steps
+                </a>
+              </div>
             </aside>
           </div>
         </section>
@@ -359,6 +417,15 @@ export default function Home() {
                 <p>Immediate disbursal.</p>
               </article>
             </div>
+            <div className="section-head section-cta reveal">
+              <p className="eyebrow">Ready To Apply</p>
+              <h2>Bring your gold and complete approval in one branch visit.</h2>
+              <div className="hero-actions">
+                <a className="btn btn-primary" href="tel:+919400081950">
+                  Call +91 9400081950
+                </a>
+              </div>
+            </div>
           </div>
         </section>
       </main>
@@ -376,7 +443,9 @@ export default function Home() {
           </div>
           <div>
             <h4>Contact</h4>
-            <p>+91 9400081950</p>
+            <p>
+              <a href="tel:+919400081950">Call Now: +91 9400081950</a>
+            </p>
           </div>
         </div>
         <div className="container footer-bottom">
