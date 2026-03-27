@@ -12,9 +12,10 @@ type GoldPricePayload = {
 };
 
 const HERO_SLIDES = [
-  "/maxresdefault.jpg",
-  "/concept-black-money-raid-confiscated-unaccounted-showing-indian-currency-notes-jewelry-151471973.webp",
-  "/close-up-indian-currency-gold-ornaments-indian-money-gold-261510009.webp",
+  "/banner-gold-loan-1.jpeg",
+  "/banner-gold-loan-2.jpeg",
+  "/banner-gold-loan-3.jpeg",
+  "/banner-gold-loan-4.jpeg",
 ] as const;
 
 const SITE_URL = (() => {
