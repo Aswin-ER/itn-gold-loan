@@ -203,11 +203,13 @@ a {
   position: sticky;
   top: var(--hero-sticky-top);
   min-height: calc(100svh - var(--hero-sticky-top));
+  min-height: calc(100dvh - var(--hero-sticky-top));
   padding: 0;
 }
 
 .hero-scroll-stage .hero-grid {
   min-height: calc(100svh - var(--hero-sticky-top));
+  min-height: calc(100dvh - var(--hero-sticky-top));
   align-content: center;
 }
 

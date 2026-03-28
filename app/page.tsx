@@ -65,7 +65,6 @@ function formatRupees(value: number) {
 export default function Home() {
   const [priceData, setPriceData] = useState<GoldPricePayload | null>(null);
   const [loadingPrice, setLoadingPrice] = useState(true);
-  const [activeHeroFrame, setActiveHeroFrame] = useState(0);
   const [activeHeroSrc, setActiveHeroSrc] = useState(HERO_SCROLL_FRAMES[0]);
   const [heroScrollProgress, setHeroScrollProgress] = useState(0);
   const [heroStageHeight, setHeroStageHeight] = useState(2600);
@@ -74,6 +73,7 @@ export default function Home() {
   const heroImagesRef = useRef<(HTMLImageElement | null)[]>(new Array(HERO_TOTAL_FRAMES).fill(null));
   const activeHeroFrameRef = useRef(0);
   const heroMetricsRef = useRef({ stageStart: 0, scrollTravel: 1 });
+  const heroLayoutRef = useRef({ stickyTop: 0, stageHeight: 0 });
 
   const { scrollY } = useScroll();
   const heroProgress = useTransform(scrollY, (latest) => {
@@ -154,29 +154,58 @@ export default function Home() {
       return;
     }
 
+    let rafId = 0;
+
+    const getViewportHeight = () => window.visualViewport?.height ?? window.innerHeight ?? 1;
+
     const updateHeroMetrics = () => {
-      const viewportHeight = window.innerHeight || 1;
+      const viewportHeight = getViewportHeight();
       const headerHeight = document.querySelector<HTMLElement>(".site-header")?.offsetHeight ?? 0;
       const scrollTravel = Math.max(HERO_TOTAL_FRAMES * 8, Math.round(viewportHeight * 1.85));
       const stageHeight = Math.max(viewportHeight - headerHeight + scrollTravel, viewportHeight * 1.35);
-      const stageTop = heroStage.getBoundingClientRect().top + (window.scrollY || window.pageYOffset || 0);
+      const stageTop = heroStage.offsetTop;
 
       heroMetricsRef.current = {
         stageStart: Math.max(stageTop - headerHeight, 0),
         scrollTravel,
       };
 
-      setHeroStickyTop(headerHeight);
-      setHeroStageHeight(stageHeight);
+      if (Math.abs(heroLayoutRef.current.stickyTop - headerHeight) > 0.5) {
+        heroLayoutRef.current.stickyTop = headerHeight;
+        setHeroStickyTop(headerHeight);
+      }
+      if (Math.abs(heroLayoutRef.current.stageHeight - stageHeight) > 1) {
+        heroLayoutRef.current.stageHeight = stageHeight;
+        setHeroStageHeight(stageHeight);
+      }
     };
 
-    const deferredUpdate = window.setTimeout(updateHeroMetrics, 200);
+    const scheduleMetricsUpdate = () => {
+      if (rafId) {
+        return;
+      }
+      rafId = window.requestAnimationFrame(() => {
+        updateHeroMetrics();
+        rafId = 0;
+      });
+    };
+
+    const deferredUpdate = window.setTimeout(scheduleMetricsUpdate, 200);
     updateHeroMetrics();
-    window.addEventListener("resize", updateHeroMetrics);
+    window.addEventListener("resize", scheduleMetricsUpdate);
+    window.addEventListener("orientationchange", scheduleMetricsUpdate);
+    window.addEventListener("pageshow", scheduleMetricsUpdate);
+    window.visualViewport?.addEventListener("resize", scheduleMetricsUpdate);
 
     return () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
       window.clearTimeout(deferredUpdate);
-      window.removeEventListener("resize", updateHeroMetrics);
+      window.removeEventListener("resize", scheduleMetricsUpdate);
+      window.removeEventListener("orientationchange", scheduleMetricsUpdate);
+      window.removeEventListener("pageshow", scheduleMetricsUpdate);
+      window.visualViewport?.removeEventListener("resize", scheduleMetricsUpdate);
     };
   }, []);
 
@@ -241,7 +270,6 @@ export default function Home() {
 
     if (resolvedFrame !== null && resolvedFrame !== activeHeroFrameRef.current) {
       activeHeroFrameRef.current = resolvedFrame;
-      setActiveHeroFrame(resolvedFrame);
       setActiveHeroSrc(HERO_SCROLL_FRAMES[resolvedFrame]);
     }
 
@@ -340,7 +368,6 @@ export default function Home() {
             <div className="hero-background" aria-hidden="true">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                key={activeHeroFrame}
                 className="hero-bg-image"
                 src={activeHeroSrc}
                 alt=""
