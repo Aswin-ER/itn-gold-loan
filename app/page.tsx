@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMotionValueEvent, useScroll, useSpring, useTransform } from "framer-motion";
 import Script from "next/script";
 
@@ -67,6 +67,8 @@ export default function Home() {
   const [loadingPrice, setLoadingPrice] = useState(true);
   const [activeHeroSrc, setActiveHeroSrc] = useState(HERO_SCROLL_FRAMES[0]);
   const [heroScrollProgress, setHeroScrollProgress] = useState(0);
+  const [heroFrameStep, setHeroFrameStep] = useState(1);
+  const [heroStaticMode, setHeroStaticMode] = useState(false);
   const [heroStageHeight, setHeroStageHeight] = useState(2600);
   const [heroStickyTop, setHeroStickyTop] = useState(0);
   const heroStageRef = useRef<HTMLDivElement | null>(null);
@@ -91,6 +93,48 @@ export default function Home() {
   const [annualRate, setAnnualRate] = useState(11.5);
   const [ltv, setLtv] = useState(75);
   const [manualPrice, setManualPrice] = useState<number | "">("");
+
+  const findNearestLoadedFrame = useCallback((frameIndex: number): number | null => {
+    if (heroImagesRef.current[frameIndex]) {
+      return frameIndex;
+    }
+
+    for (let offset = 1; offset < HERO_TOTAL_FRAMES; offset += 1) {
+      const backward = frameIndex - offset;
+      if (backward >= 0 && heroImagesRef.current[backward]) {
+        return backward;
+      }
+
+      const forward = frameIndex + offset;
+      if (forward < HERO_TOTAL_FRAMES && heroImagesRef.current[forward]) {
+        return forward;
+      }
+    }
+
+    return null;
+  }, []);
+
+  const applyHeroFrameForProgress = useCallback((progress: number) => {
+    if (heroStaticMode) {
+      return;
+    }
+
+    const bounded = Math.min(Math.max(progress, 0), 1);
+    const rawFrameIndex = Math.round(bounded * (HERO_TOTAL_FRAMES - 1));
+    const frameStep = Math.max(heroFrameStep, 1);
+    const frameIndex = Math.min(
+      HERO_TOTAL_FRAMES - 1,
+      Math.max(0, Math.round(rawFrameIndex / frameStep) * frameStep),
+    );
+    const resolvedFrame = findNearestLoadedFrame(frameIndex);
+
+    if (resolvedFrame !== null && resolvedFrame !== activeHeroFrameRef.current) {
+      activeHeroFrameRef.current = resolvedFrame;
+      setActiveHeroSrc(HERO_SCROLL_FRAMES[resolvedFrame]);
+    }
+
+    setHeroScrollProgress((prev) => (Math.abs(prev - bounded) < 0.001 ? prev : bounded));
+  }, [findNearestLoadedFrame, heroFrameStep, heroStaticMode]);
 
   useEffect(() => {
     const revealNodes = document.querySelectorAll<HTMLElement>(".reveal");
@@ -149,6 +193,94 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    type NetworkConnection = {
+      saveData?: boolean;
+      effectiveType?: string;
+      addEventListener?: (type: "change", listener: () => void) => void;
+      removeEventListener?: (type: "change", listener: () => void) => void;
+    };
+    type NavigatorWithConnection = Navigator & { connection?: NetworkConnection };
+
+    const nav = window.navigator as NavigatorWithConnection;
+    const connection = nav.connection;
+    const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const mobileViewportQuery = window.matchMedia("(max-width: 900px)");
+    type LegacyMediaQueryList = MediaQueryList & {
+      addListener?: (listener: (event: MediaQueryListEvent) => void) => void;
+      removeListener?: (listener: (event: MediaQueryListEvent) => void) => void;
+    };
+    const addMediaListener = (query: MediaQueryList, handler: () => void) => {
+      query.addEventListener("change", handler);
+      (query as LegacyMediaQueryList).addListener?.(handler);
+    };
+    const removeMediaListener = (query: MediaQueryList, handler: () => void) => {
+      query.removeEventListener("change", handler);
+      (query as LegacyMediaQueryList).removeListener?.(handler);
+    };
+
+    const applyPerformanceMode = () => {
+      const reducedMotion = reducedMotionQuery.matches;
+      const saveData = Boolean(connection?.saveData);
+      const slowNetwork = /(2g|3g)/i.test(connection?.effectiveType ?? "");
+      const mobileViewport = mobileViewportQuery.matches;
+
+      const staticMode = reducedMotion || saveData;
+      const frameStep = staticMode ? HERO_TOTAL_FRAMES : mobileViewport || slowNetwork ? 2 : 1;
+
+      setHeroStaticMode(staticMode);
+      setHeroFrameStep(frameStep);
+
+      if (staticMode) {
+        activeHeroFrameRef.current = 0;
+        setActiveHeroSrc(HERO_SCROLL_FRAMES[0]);
+        setHeroScrollProgress(0);
+      }
+    };
+
+    applyPerformanceMode();
+    addMediaListener(reducedMotionQuery, applyPerformanceMode);
+    addMediaListener(mobileViewportQuery, applyPerformanceMode);
+    connection?.addEventListener?.("change", applyPerformanceMode);
+
+    return () => {
+      removeMediaListener(reducedMotionQuery, applyPerformanceMode);
+      removeMediaListener(mobileViewportQuery, applyPerformanceMode);
+      connection?.removeEventListener?.("change", applyPerformanceMode);
+    };
+  }, []);
+
+  useEffect(() => {
+    const isIOS =
+      /iPad|iPhone|iPod/.test(window.navigator.userAgent) ||
+      (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
+    if (!isIOS) {
+      return;
+    }
+
+    const navEntry = window.performance.getEntriesByType("navigation")[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    if (navEntry?.type !== "reload") {
+      return;
+    }
+
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+
+    const rafId = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      activeHeroFrameRef.current = 0;
+      setActiveHeroSrc(HERO_SCROLL_FRAMES[0]);
+      setHeroScrollProgress(0);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
+  }, []);
+
+  useEffect(() => {
     const heroStage = heroStageRef.current;
     if (!heroStage) {
       return;
@@ -161,14 +293,21 @@ export default function Home() {
     const updateHeroMetrics = () => {
       const viewportHeight = getViewportHeight();
       const headerHeight = document.querySelector<HTMLElement>(".site-header")?.offsetHeight ?? 0;
-      const scrollTravel = Math.max(HERO_TOTAL_FRAMES * 8, Math.round(viewportHeight * 1.85));
-      const stageHeight = Math.max(viewportHeight - headerHeight + scrollTravel, viewportHeight * 1.35);
+      const frameCount = Math.ceil(HERO_TOTAL_FRAMES / Math.max(heroFrameStep, 1));
+      const scrollTravel = heroStaticMode ? 1 : Math.max(frameCount * 8, Math.round(viewportHeight * 1.7));
+      const stageHeight = heroStaticMode
+        ? Math.max(viewportHeight - headerHeight + 1, viewportHeight * 1.05)
+        : Math.max(viewportHeight - headerHeight + scrollTravel, viewportHeight * 1.35);
       const stageTop = heroStage.offsetTop;
 
       heroMetricsRef.current = {
         stageStart: Math.max(stageTop - headerHeight, 0),
         scrollTravel,
       };
+
+      const currentScrollY = window.scrollY || window.pageYOffset || 0;
+      const currentProgress = (currentScrollY - heroMetricsRef.current.stageStart) / heroMetricsRef.current.scrollTravel;
+      applyHeroFrameForProgress(currentProgress);
 
       if (Math.abs(heroLayoutRef.current.stickyTop - headerHeight) > 0.5) {
         heroLayoutRef.current.stickyTop = headerHeight;
@@ -207,33 +346,29 @@ export default function Home() {
       window.removeEventListener("pageshow", scheduleMetricsUpdate);
       window.visualViewport?.removeEventListener("resize", scheduleMetricsUpdate);
     };
-  }, []);
-
-  const findNearestLoadedFrame = (frameIndex: number): number | null => {
-    if (heroImagesRef.current[frameIndex]) {
-      return frameIndex;
-    }
-
-    for (let offset = 1; offset < HERO_TOTAL_FRAMES; offset += 1) {
-      const backward = frameIndex - offset;
-      if (backward >= 0 && heroImagesRef.current[backward]) {
-        return backward;
-      }
-
-      const forward = frameIndex + offset;
-      if (forward < HERO_TOTAL_FRAMES && heroImagesRef.current[forward]) {
-        return forward;
-      }
-    }
-
-    return null;
-  };
+  }, [applyHeroFrameForProgress, heroFrameStep, heroStaticMode]);
 
   useEffect(() => {
     let cancelled = false;
     heroImagesRef.current = new Array(HERO_TOTAL_FRAMES).fill(null);
 
+    if (heroStaticMode) {
+      const img = new Image();
+      img.decoding = "async";
+      img.src = HERO_SCROLL_FRAMES[0];
+      heroImagesRef.current[0] = img;
+      setActiveHeroSrc(HERO_SCROLL_FRAMES[0]);
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
     HERO_SCROLL_FRAMES.forEach((src, index) => {
+      if (index % heroFrameStep !== 0 && index !== HERO_TOTAL_FRAMES - 1) {
+        return;
+      }
+
       const img = new Image();
       let committed = false;
 
@@ -261,19 +396,10 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [heroFrameStep, heroStaticMode]);
 
   useMotionValueEvent(smoothHeroProgress, "change", (latest) => {
-    const progress = Math.min(Math.max(latest, 0), 1);
-    const frameIndex = Math.round(progress * (HERO_TOTAL_FRAMES - 1));
-    const resolvedFrame = findNearestLoadedFrame(frameIndex);
-
-    if (resolvedFrame !== null && resolvedFrame !== activeHeroFrameRef.current) {
-      activeHeroFrameRef.current = resolvedFrame;
-      setActiveHeroSrc(HERO_SCROLL_FRAMES[resolvedFrame]);
-    }
-
-    setHeroScrollProgress((prev) => (Math.abs(prev - progress) < 0.001 ? prev : progress));
+    applyHeroFrameForProgress(latest);
   });
 
   const pricePerGram = manualPrice === "" ? (priceData?.pricePerGramInr ?? null) : manualPrice;
@@ -361,7 +487,7 @@ export default function Home() {
       <main>
         <div
           ref={heroStageRef}
-          className="hero-scroll-stage"
+          className={`hero-scroll-stage${heroStaticMode ? " is-static" : ""}`}
           style={heroStageStyle}
         >
           <section id="hero" className="hero section">
@@ -399,11 +525,13 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <div className="hero-scroll-meter" aria-hidden="true">
-              <div className="hero-scroll-track">
-                <div className="hero-scroll-fill" style={{ transform: `scaleX(${heroScrollProgress})` }} />
+            {!heroStaticMode && (
+              <div className="hero-scroll-meter" aria-hidden="true">
+                <div className="hero-scroll-track">
+                  <div className="hero-scroll-fill" style={{ transform: `scaleX(${heroScrollProgress})` }} />
+                </div>
               </div>
-            </div>
+            )}
           </section>
         </div>
 
