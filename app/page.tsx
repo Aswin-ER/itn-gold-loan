@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { useMotionValueEvent, useScroll, useSpring, useTransform } from "framer-motion";
 import Script from "next/script";
 
 type GoldPricePayload = {
@@ -11,12 +12,11 @@ type GoldPricePayload = {
   updatedAt: string;
 };
 
-const HERO_SLIDES = [
-  "/banner-gold-loan-1.jpeg",
-  "/banner-gold-loan-2.jpeg",
-  "/banner-gold-loan-3.jpeg",
-  "/banner-gold-loan-4.jpeg",
-] as const;
+const HERO_TOTAL_FRAMES = 240;
+const HERO_SCROLL_FRAMES = Array.from(
+  { length: HERO_TOTAL_FRAMES },
+  (_, index) => `/banner-scroll/ezgif-frame-${String(index + 1).padStart(3, "0")}.jpg`,
+);
 
 const SITE_URL = (() => {
   const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
@@ -65,7 +65,26 @@ function formatRupees(value: number) {
 export default function Home() {
   const [priceData, setPriceData] = useState<GoldPricePayload | null>(null);
   const [loadingPrice, setLoadingPrice] = useState(true);
-  const [activeSlide, setActiveSlide] = useState(0);
+  const [activeHeroFrame, setActiveHeroFrame] = useState(0);
+  const [activeHeroSrc, setActiveHeroSrc] = useState(HERO_SCROLL_FRAMES[0]);
+  const [heroScrollProgress, setHeroScrollProgress] = useState(0);
+  const [heroStageHeight, setHeroStageHeight] = useState(2600);
+  const [heroStickyTop, setHeroStickyTop] = useState(0);
+  const heroStageRef = useRef<HTMLDivElement | null>(null);
+  const heroImagesRef = useRef<(HTMLImageElement | null)[]>(new Array(HERO_TOTAL_FRAMES).fill(null));
+  const activeHeroFrameRef = useRef(0);
+  const heroMetricsRef = useRef({ stageStart: 0, scrollTravel: 1 });
+
+  const { scrollY } = useScroll();
+  const heroProgress = useTransform(scrollY, (latest) => {
+    const { stageStart, scrollTravel } = heroMetricsRef.current;
+    return Math.min(Math.max((latest - stageStart) / scrollTravel, 0), 1);
+  });
+  const smoothHeroProgress = useSpring(heroProgress, {
+    stiffness: 120,
+    damping: 28,
+    mass: 0.35,
+  });
 
   const [weight, setWeight] = useState(35);
   const [tenure, setTenure] = useState(12);
@@ -130,12 +149,104 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveSlide((prev) => (prev + 1) % HERO_SLIDES.length);
-    }, 4500);
+    const heroStage = heroStageRef.current;
+    if (!heroStage) {
+      return;
+    }
 
-    return () => clearInterval(interval);
+    const updateHeroMetrics = () => {
+      const viewportHeight = window.innerHeight || 1;
+      const headerHeight = document.querySelector<HTMLElement>(".site-header")?.offsetHeight ?? 0;
+      const scrollTravel = Math.max(HERO_TOTAL_FRAMES * 8, Math.round(viewportHeight * 1.85));
+      const stageHeight = Math.max(viewportHeight - headerHeight + scrollTravel, viewportHeight * 1.35);
+      const stageTop = heroStage.getBoundingClientRect().top + (window.scrollY || window.pageYOffset || 0);
+
+      heroMetricsRef.current = {
+        stageStart: Math.max(stageTop - headerHeight, 0),
+        scrollTravel,
+      };
+
+      setHeroStickyTop(headerHeight);
+      setHeroStageHeight(stageHeight);
+    };
+
+    const deferredUpdate = window.setTimeout(updateHeroMetrics, 200);
+    updateHeroMetrics();
+    window.addEventListener("resize", updateHeroMetrics);
+
+    return () => {
+      window.clearTimeout(deferredUpdate);
+      window.removeEventListener("resize", updateHeroMetrics);
+    };
   }, []);
+
+  const findNearestLoadedFrame = (frameIndex: number): number | null => {
+    if (heroImagesRef.current[frameIndex]) {
+      return frameIndex;
+    }
+
+    for (let offset = 1; offset < HERO_TOTAL_FRAMES; offset += 1) {
+      const backward = frameIndex - offset;
+      if (backward >= 0 && heroImagesRef.current[backward]) {
+        return backward;
+      }
+
+      const forward = frameIndex + offset;
+      if (forward < HERO_TOTAL_FRAMES && heroImagesRef.current[forward]) {
+        return forward;
+      }
+    }
+
+    return null;
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    heroImagesRef.current = new Array(HERO_TOTAL_FRAMES).fill(null);
+
+    HERO_SCROLL_FRAMES.forEach((src, index) => {
+      const img = new Image();
+      let committed = false;
+
+      const commitImage = () => {
+        if (cancelled || committed) {
+          return;
+        }
+        committed = true;
+        heroImagesRef.current[index] = img;
+
+        if (index === 0 && activeHeroFrameRef.current === 0) {
+          setActiveHeroSrc(HERO_SCROLL_FRAMES[0]);
+        }
+      };
+
+      img.decoding = "async";
+      img.onload = commitImage;
+      img.onerror = () => {
+        committed = true;
+      };
+      img.src = src;
+      img.decode?.().then(commitImage).catch(() => {});
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useMotionValueEvent(smoothHeroProgress, "change", (latest) => {
+    const progress = Math.min(Math.max(latest, 0), 1);
+    const frameIndex = Math.round(progress * (HERO_TOTAL_FRAMES - 1));
+    const resolvedFrame = findNearestLoadedFrame(frameIndex);
+
+    if (resolvedFrame !== null && resolvedFrame !== activeHeroFrameRef.current) {
+      activeHeroFrameRef.current = resolvedFrame;
+      setActiveHeroFrame(resolvedFrame);
+      setActiveHeroSrc(HERO_SCROLL_FRAMES[resolvedFrame]);
+    }
+
+    setHeroScrollProgress((prev) => (Math.abs(prev - progress) < 0.001 ? prev : progress));
+  });
 
   const pricePerGram = manualPrice === "" ? (priceData?.pricePerGramInr ?? null) : manualPrice;
   const purityFactor = 1;
@@ -168,6 +279,17 @@ export default function Home() {
 
   const formatEstimateValue = (value: number | null) =>
     value === null ? "Not available" : formatRupees(value);
+
+  const heroStageStyle = {
+    height: `${heroStageHeight}px`,
+    "--hero-sticky-top": `${heroStickyTop}px`,
+  } as CSSProperties;
+  const heroCopyProgress = Math.min(Math.max(heroScrollProgress, 0), 1);
+  const heroCopyStyle = {
+    opacity: Math.max(1 - heroCopyProgress * 1.25, 0),
+    transform: `translate3d(0, ${Math.round(heroCopyProgress * 88)}px, 0) scale(${(1 - heroCopyProgress * 0.08).toFixed(3)})`,
+    filter: `blur(${(heroCopyProgress * 1.3).toFixed(2)}px)`,
+  } as CSSProperties;
 
   return (
     <div className="page-shell">
@@ -209,45 +331,54 @@ export default function Home() {
       </header>
 
       <main>
-        <section id="hero" className="hero section">
-          <div className="hero-background" aria-hidden="true">
-            {HERO_SLIDES.map((imageUrl, index) => (
-              <div
-                key={imageUrl}
-                className={`hero-bg-slide ${index === activeSlide ? "is-active" : ""}`}
-                style={{ backgroundImage: `url(${imageUrl})` }}
+        <div
+          ref={heroStageRef}
+          className="hero-scroll-stage"
+          style={heroStageStyle}
+        >
+          <section id="hero" className="hero section">
+            <div className="hero-background" aria-hidden="true">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                key={activeHeroFrame}
+                className="hero-bg-image"
+                src={activeHeroSrc}
+                alt=""
+                loading="eager"
+                decoding="async"
+                draggable={false}
               />
-            ))}
-          </div>
-          <div className="hero-overlay" aria-hidden="true" />
-          <div className="hero-glow orb-1" />
-          <div className="hero-glow orb-2" />
-          <div className="container hero-grid">
-            <div className="hero-copy reveal">
-              <p className="eyebrow">Market-Linked Gold Loans</p>
-              <h1>
-                Get premium liquidity for your gold with <span>live value protection</span>.
-              </h1>
-              <p>
-                Built for urgent needs and long-term trust. Walk in with jewellery, leave with a
-                transparent offer, secure custody, and same-day disbursal.
-              </p>
-              <div className="hero-actions">
-                <a className="btn btn-primary" href="tel:+919400081950">
-                  Call Now For Instant Quote
-                </a>
-                <a className="btn btn-ghost" href="#calculator">
-                  Check EMI & Eligibility
-                </a>
+            </div>
+            <div className="hero-overlay" aria-hidden="true" />
+            <div className="hero-glow orb-1" />
+            <div className="hero-glow orb-2" />
+            <div className="container hero-grid">
+              <div className="hero-copy" style={heroCopyStyle}>
+                <p className="eyebrow">Market-Linked Gold Loans</p>
+                <h1>
+                  Get premium liquidity for your gold with <span>live value protection</span>.
+                </h1>
+                <p>
+                  Built for urgent needs and long-term trust. Walk in with jewellery, leave with a
+                  transparent offer, secure custody, and same-day disbursal.
+                </p>
+                <div className="hero-actions">
+                  <a className="btn btn-primary" href="tel:+919400081950">
+                    Call Now For Instant Quote
+                  </a>
+                  <a className="btn btn-ghost" href="#calculator">
+                    Check EMI & Eligibility
+                  </a>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="hero-slider-dots" aria-hidden="true">
-            {HERO_SLIDES.map((_, index) => (
-              <span key={index} className={`slider-dot ${index === activeSlide ? "is-active" : ""}`} />
-            ))}
-          </div>
-        </section>
+            <div className="hero-scroll-meter" aria-hidden="true">
+              <div className="hero-scroll-track">
+                <div className="hero-scroll-fill" style={{ transform: `scaleX(${heroScrollProgress})` }} />
+              </div>
+            </div>
+          </section>
+        </div>
 
         <section id="benefits" className="section benefits">
           <div className="container">

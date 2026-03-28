@@ -193,6 +193,24 @@ a {
   padding: 88px 0;
 }
 
+.hero-scroll-stage {
+  position: relative;
+  --hero-sticky-top: 0px;
+  height: 265svh;
+}
+
+.hero-scroll-stage .hero {
+  position: sticky;
+  top: var(--hero-sticky-top);
+  min-height: calc(100svh - var(--hero-sticky-top));
+  padding: 0;
+}
+
+.hero-scroll-stage .hero-grid {
+  min-height: calc(100svh - var(--hero-sticky-top));
+  align-content: center;
+}
+
 .hero {
   position: relative;
   overflow: hidden;
@@ -207,24 +225,19 @@ a {
   position: absolute;
   inset: 0;
   z-index: 0;
+  background-color: #17110a;
 }
 
-.hero-bg-slide {
+.hero-bg-image {
   position: absolute;
   inset: 0;
-  opacity: 0;
-  transform: scale(1);
-  background-color: #17110a;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  filter: brightness(1.02) contrast(1.01) saturate(1.01);
-  transition: opacity 0.85s ease, transform 7.5s linear;
-}
-
-.hero-bg-slide.is-active {
-  opacity: 1;
-  transform: scale(1);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .hero-overlay {
@@ -551,29 +564,38 @@ a {
   color: #fff1d4;
 }
 
-.hero-slider-dots {
+.hero-scroll-meter {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 12px;
   z-index: 4;
   display: flex;
-  justify-content: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
   margin-top: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(247, 214, 156, 0.35);
+  background: rgba(8, 6, 4, 0.3);
+  backdrop-filter: blur(4px);
+  min-width: min(280px, 74vw);
 }
 
-.slider-dot {
-  width: 24px;
+.hero-scroll-track {
+  width: 100%;
   height: 4px;
   border-radius: 999px;
-  background: rgba(255, 233, 188, 0.35);
-  transition: transform 0.24s ease, background-color 0.24s ease;
+  background: rgba(255, 233, 188, 0.26);
+  overflow: hidden;
 }
 
-.slider-dot.is-active {
-  transform: scaleX(1.12);
-  background: #f0cd89;
+.hero-scroll-fill {
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  background: linear-gradient(90deg, #e0b96f 0%, #f7deb1 100%);
 }
 
 .section-head {
@@ -1068,23 +1090,14 @@ a {
     align-items: flex-start;
   }
 
-  .hero-slider-dots {
-    position: absolute;
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
+  .hero-scroll-meter {
     bottom: 12px;
-    margin-top: 0;
-    gap: 5px;
-    width: max-content;
-    padding: 4px 8px;
-    border-radius: 999px;
-    background: rgba(8, 6, 4, 0.28);
-    backdrop-filter: blur(3px);
+    min-width: min(220px, 82vw);
+    padding: 6px 10px;
+    gap: 0;
   }
 
-  .slider-dot {
-    width: 12px;
+  .hero-scroll-track {
     height: 3px;
   }
 
@@ -1170,9 +1183,8 @@ a {
     padding: 9px 10px;
   }
 
-  .slider-dot {
-    width: 10px;
-    height: 3px;
+  .hero-scroll-meter {
+    min-width: min(200px, 84vw);
   }
 
   .section-head h2 {

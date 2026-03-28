@@ -62,14 +62,14 @@ export const metadata: Metadata = {
     title: "ITN GOLD LOAN | Instant Gold Loan in Thrissur",
     description:
       "Live-rate valuation, secure custody, and same-day disbursal for your gold loan needs.",
-    images: ["/maxresdefault.jpg"],
+    images: ["/banner-scroll/ezgif-frame-001.jpg"],
   },
   twitter: {
     card: "summary_large_image",
     title: "ITN GOLD LOAN | Instant Gold Loan in Thrissur",
     description:
       "Check eligibility, estimate EMI, and connect with ITN GOLD LOAN for same-day gold loan disbursal.",
-    images: ["/maxresdefault.jpg"],
+    images: ["/banner-scroll/ezgif-frame-001.jpg"],
   },
   icons: {
     icon: "/icon.svg",
